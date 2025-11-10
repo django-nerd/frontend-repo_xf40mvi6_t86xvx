@@ -53,11 +53,57 @@ function App() {
       }
       const data = await res.json()
       setSuccessMsg('Konten berhasil digenerate!')
-      setJobs((prev) => [data.job, ...prev])
+      const newJob = { _id: data.id, ...data.job }
+      setJobs((prev) => [newJob, ...prev])
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const callTTS = async (jobId) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, lang: 'id', slow: false }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Gagal membuat voice-over')
+      setJobs((prev) => prev.map(j => j._id === jobId ? { ...j, audio_url: data.audio_url, status: data.status } : j))
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const callThumbnail = async (jobId) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/thumbnail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Gagal membuat thumbnail')
+      setJobs((prev) => prev.map(j => j._id === jobId ? { ...j, thumbnail_url: data.thumbnail_url, status: data.status } : j))
+    } catch (e) {
+      alert(e.message)
+    }
+  }
+
+  const callUpload = async (jobId) => {
+    try {
+      const res = await fetch(`${BACKEND}/api/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, privacy_status: 'unlisted' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Gagal upload ke YouTube')
+      setJobs((prev) => prev.map(j => j._id === jobId ? { ...j, youtube_url: data.youtube_url, upload_status: data.status } : j))
+    } catch (e) {
+      alert(e.message)
     }
   }
 
@@ -96,7 +142,7 @@ function App() {
 
       {/* Generator */}
       <section id="generator" className="relative z-10 -mt-10 rounded-t-3xl bg-slate-900/80 backdrop-blur-sm border-t border-white/10 px-6 py-10">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
+        <div className="max-w-6xl mx-auto grid xl:grid-cols-3 md:grid-cols-2 gap-8">
           <div className="bg-white/5 border border-white/10 rounded-xl p-6">
             <h2 className="text-xl font-semibold">Generator Konten</h2>
             <p className="text-white/70 text-sm mt-1">Masukkan niche, pilih gaya, dan agen akan membuatkan outline + skrip.</p>
@@ -140,7 +186,7 @@ function App() {
             </form>
           </div>
 
-          <div className="space-y-4">
+          <div className="xl:col-span-2 space-y-4">
             <h2 className="text-xl font-semibold">Hasil Terbaru</h2>
             <div className="space-y-4">
               {jobs.length === 0 && (
@@ -167,6 +213,40 @@ function App() {
                   )}
                   {job.script && (
                     <pre className="mt-3 whitespace-pre-wrap text-sm text-white/80 bg-black/30 border border-white/10 rounded p-3 max-h-56 overflow-auto">{job.script}</pre>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button onClick={() => callTTS(job._id)} className="text-sm px-3 py-2 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30">Buat Voice-over</button>
+                    <button onClick={() => callThumbnail(job._id)} className="text-sm px-3 py-2 rounded-md bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30">Buat Thumbnail</button>
+                    <button onClick={() => callUpload(job._id)} className="text-sm px-3 py-2 rounded-md bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border border-fuchsia-400/30">Upload ke YouTube</button>
+                    <button onClick={fetchJobs} className="text-sm px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 border border-white/10">Refresh</button>
+                  </div>
+
+                  {/* Previews */}
+                  <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                    {job.audio_url && (
+                      <div className="bg-black/30 rounded-md border border-white/10 p-3">
+                        <p className="text-xs text-white/60 mb-2">Voice-over</p>
+                        <audio controls src={`${BACKEND}${job.audio_url}`} className="w-full" />
+                      </div>
+                    )}
+                    {job.thumbnail_url && (
+                      <div className="bg-black/30 rounded-md border border-white/10 p-3">
+                        <p className="text-xs text-white/60 mb-2">Thumbnail</p>
+                        <img src={`${BACKEND}${job.thumbnail_url}`} alt="thumbnail" className="w-full rounded" />
+                      </div>
+                    )}
+                  </div>
+
+                  {job.youtube_url && (
+                    <div className="mt-3 text-sm">
+                      <a className="text-sky-300 hover:text-sky-200 underline" href={job.youtube_url} target="_blank" rel="noreferrer">Lihat di YouTube</a>
+                    </div>
+                  )}
+
+                  {(job.upload_status || job.status) && (
+                    <p className="mt-2 text-xs text-white/60">Status: {job.upload_status || job.status}</p>
                   )}
                 </article>
               ))}
